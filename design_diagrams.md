@@ -1,140 +1,192 @@
-# Especificación de Diseño y Procesos: TokenTicket
+# Spot: Diagramas de Diseño
 
-## 1. Estrategia de Abstracción Web3 (Invisible Wallet)
-Para cumplir con el requisito de "abstraer la complejidad", el sistema implementará un modelo de **Billeteras Custodias (Custodial Wallets)** o **Inicio de Sesión Social (Web3Auth)**.
-
-*   **Usuario Final:** Se registra con Google/Email. No ve "frases semilla" ni firma transacciones manualmente. El backend gestiona su llave privada de forma segura (o se usa MPC - Multi-Party Computation).
-*   **Transacciones:** El usuario paga con tarjeta (simulado) y el sistema "atrás" acuña/transfiere el NFT a su billetera.
-*   **Gas Fees:** El organizador o la plataforma subvencionan los costos de gas (Gasless Transactions) para que la experiencia sea 100% fluida.
-
----
-
-## 2. Diagramas de Casos de Uso
-
-### Actores
-*   **Asistente (Fan):** Usuario final. Quiere comprar entradas y entrar al evento sin saber de crypto.
-*   **Organizador:** Crea eventos, define reglas y envía beneficios (drops).
-*   **Validador (Seguridad):** Verifica las entradas en la puerta.
-*   **Sistema (Backend/Blockchain):** Gestiona la lógica automática.
+## 1. Actores del Sistema
 
 ```mermaid
 graph LR
-    %% Actores
-    Fan((Asistente/Fan))
-    Org((Organizador))
-    Sec((Validador))
-
-    %% Casos de Uso
-    subgraph Platform [TokenTicket Platform]
-        direction TB
-        UC1("Registrarse con Email/Google")
-        UC2("Comprar Entrada Fiat")
-        UC3("Ver Entradas QR/NFC")
-        UC4("Revender Entrada")
-        UC5("Crear Evento & Aforo")
-        UC6("Definir Reglas Royalty")
-        UC7("Enviar Drop/Beneficio")
-        UC8("Validar Entrada")
+    subgraph Usuarios
+        Fan((Fan/Cliente))
+        Org((Organizador))
+        Artist((Artista))
+        Staff((Validador))
     end
 
-    %% Relaciones
-    Fan --> UC1
-    Fan --> UC2
-    Fan --> UC3
-    Fan --> UC4
-    
-    Org --> UC5
-    Org --> UC6
-    Org --> UC7
-    
-    Sec --> UC8
-    
-    %% Notas (usando nodos de texto simulados is es necesario, o comentarios)
-    %% Mermaid graph no soporta 'note right of' nativo igual que sequence, 
-    %% pero es mas seguro que usecaseDiagram que falla.
+    subgraph Plataforma [Spot]
+        direction TB
+        UC1(Registrarse/Login)
+        UC2(Comprar Entrada)
+        UC3(Ver Mis Entradas)
+        UC4(Revender Entrada)
+        UC5(Unirse a Fan Club)
+        UC6(Crear Evento)
+        UC7(Ver Ventas)
+        UC8(Crear Fan Club)
+        UC9(Enviar Drops)
+        UC10(Validar Entrada NFC)
+    end
+
+    Fan --> UC1 & UC2 & UC3 & UC4 & UC5
+    Org --> UC6 & UC7
+    Artist --> UC8 & UC9
+    Staff --> UC10
 ```
 
 ---
 
-## 3. Diagramas de Procesos (BPMN)
-
-### 3.1. Proceso de Compra de Entrada (Abstracción Web3)
-Este flujo muestra cómo transformamos un pago tradicional en una transacción blockchain transparente para el usuario.
+## 2. Flujo de Compra (Venta Primaria)
 
 ```mermaid
 sequenceDiagram
-    participant User as Usuario (Web/Mobile)
-    participant API as Backend (NestJS)
-    participant DB as Base de Datos
-    participant Chain as Solana Blockchain
-    
-    User->>API: 1. Solicita compra (EventoID, Cantidad)
-    API->>DB: 2. Verifica aforo disponible
-    DB-->>API: Aforo OK
-    User->>API: 3. Realiza Pago (Simulado en USD/CLP)
-    API->>API: 4. Valida pago exitoso
-    
-    par Minting Asíncrono (Invisible)
-        API->>Chain: 5. Mint/Transfer NFT a Wallet del Usuario
-        Chain-->>API: 6. Confirmación (TxHash)
-        API->>DB: 7. Guarda referencia del NFT (Mint Address)
-    end
-    
-    API-->>User: 8. "¡Compra Exitosa! Tu entrada está lista"
-    Note over User, API: El usuario nunca vio una wallet ni pagó gas.
+    participant U as Usuario
+    participant W as Web/App
+    participant API as Backend
+    participant Pay as WebPay/MercadoPago
+    participant Chain as Solana
+
+    U->>W: Selecciona evento y sector
+    W->>API: Reservar ticket (5 min)
+    API-->>W: Ticket reservado
+    W->>Pay: Iniciar pago (CLP)
+    Pay->>U: Formulario de pago
+    U->>Pay: Completa pago
+    Pay->>API: Webhook: Pago exitoso
+    API->>Chain: Mint NFT a wallet usuario
+    Chain-->>API: TxHash
+    API-->>W: Compra confirmada
+    W-->>U: ¡Ya tienes tu entrada!
 ```
 
-### 3.2. Proceso de Validación de Acceso (NFC/QR)
-Validación segura offline-first u online rápida garantizando que el ticket es válido y no ha sido usado.
+---
+
+## 3. Flujo de Reventa (Mercado Secundario)
+
+```mermaid
+sequenceDiagram
+    participant V as Vendedor
+    participant C as Comprador
+    participant API as Backend
+    participant Pay as MercadoPago
+    participant Chain as Solana
+
+    V->>API: Listar entrada ($X, máx original+20%)
+    API-->>V: Entrada en marketplace
+    C->>API: Ver marketplace
+    API-->>C: Lista de entradas
+    C->>Pay: Pagar entrada
+    Pay->>API: Webhook: Pago exitoso
+    
+    Note over API: Distribución automática
+    API->>API: Vendedor: 85%
+    API->>API: Organizador: 5%
+    API->>API: Artista: 5%
+    API->>API: Spot: 5%
+    
+    API->>Chain: Transferir NFT a comprador
+    Chain-->>API: TxHash
+    API-->>C: Entrada tuya
+    API-->>V: Pago recibido
+```
+
+---
+
+## 4. Flujo de Validación (Ingreso NFC)
 
 ```mermaid
 graph TD
-    Start((Inicio)) --> Scan[Validador escanea NFC/QR del Usuario]
-    Scan --> GetToken[Obtener Firma/Token del Dispositivo]
-    GetToken --> CheckSig{¿Firma Válida?}
-    
-    CheckSig -- No --> Deny[⛔ Acceso Denegado: Firma Inválida]
-    CheckSig -- Sí --> QueryChain{¿Es Dueño del NFT?}
-    
-    QueryChain -- No --> Deny2[⛔ Acceso Denegado: No posee entrada]
-    QueryChain -- Sí --> CheckUsed{¿Entrada ya usada?}
-    
-    CheckUsed -- Sí --> Deny3[⛔ Acceso Denegado: Ya ingresó]
-    CheckUsed -- No --> MarkUsed[Marcar Entrada como 'Ingresada' en DB/Chain]
-    MarkUsed --> Grant[✅ ACCESO PERMITIDO]
-    Grant --> End((Fin))
+    A[Staff escanea NFC] --> B{Firma válida?}
+    B -- No --> X1[⛔ DENEGADO: Firma inválida]
+    B -- Sí --> C{Es dueño del NFT?}
+    C -- No --> X2[⛔ DENEGADO: No es tuya]
+    C -- Sí --> D{Ya usada?}
+    D -- Sí --> X3[⛔ DENEGADO: Ya ingresaste]
+    D -- No --> E[Marcar como usada]
+    E --> F[✅ BIENVENIDO]
 ```
 
-### 3.3. Ciclo de Vida del Fan Club (Drops & Fidelización)
-Cómo el organizador interactúa con sus fans post-evento (Flujo BPMN en Carriles).
+---
+
+## 5. Fan Club: Preventa y Drops
 
 ```mermaid
-graph TB
-    subgraph Organizador
-        direction TB
-        A["Inicio: Decide premiar fans"] --> B["Seleccionar Evento Pasado"]
-        B --> C["Definir Beneficio (Promo/NFT)"]
-        C --> D["Ejecutar Drop"]
-    end
+sequenceDiagram
+    participant A as Artista
+    participant API as Backend
+    participant FC as Fan Club Member
+    participant Chain as Solana
+
+    Note over A: Crear Fan Club
+    A->>API: Crear club "Deathbat Club"
+    API->>Chain: Deploy colección NFT
+
+    Note over FC: Unirse al club
+    FC->>API: Comprar membresía
+    API->>Chain: Mint membresía NFT
+    API-->>FC: Eres miembro
+
+    Note over A: Crear evento con preventa
+    A->>API: Evento con preventa 48h para club
     
-    subgraph Sistema ["Sistema (Backend & Blockchain)"]
-        direction TB
-        D --> E["Query: Buscar Holders"]
-        E --> F["Filtrar: ¿Asistieron?"]
-        F --> G{"¿Hay beneficiarios?"}
-        G -- No --> H["Fin: Reportar vacío"]
-        G -- Sí --> I["Batch Minting / Airdrop"]
-        I --> J["Notificar Usuarios"]
-    end
-    
-    subgraph Asistente
-        direction TB
-        J --> K["Recibe Notificación Push"]
-        K --> L["Ver regalo en Billetera"]
-    end
+    Note over FC: Preventa exclusiva
+    FC->>API: Comprar en preventa
+    API->>API: Verificar tiene NFT club
+    API->>Chain: Mint ticket con diseño exclusivo
+
+    Note over A: Enviar drop post-evento
+    A->>API: Crear drop (Meet & Greet)
+    API->>API: Buscar holders club que asistieron
+    API->>Chain: Batch airdrop beneficio
+    API-->>FC: ¡Tienes un Meet & Greet!
 ```
 
-## 4. Actualización del Stack para Abstracción
-*   **Auth:** Usaremos **Web3Auth** o una implementación propia de custodia cifrada en backend.
-*   **Pagos:** Integración mock de Stripe/MercadoPago para simular el flujo "Web2".
-*   **Gas:** Usaremos un "Fee Payer" (una wallet del sistema que paga todas las comisiones de los usuarios).
+---
+
+## 6. Tipos de Diseño de Entrada
+
+| Tipo | Descripción | Quién lo obtiene |
+|---|---|---|
+| **Estándar** | Diseño base del evento | Compra pública |
+| **Fan Club** | Diseño premium exclusivo | Compra en preventa club |
+| **VIP** | Diseño dorado + beneficios | Tier especial |
+| **Coleccionable** | Post-evento, recuerdo digital | Todos los asistentes |
+
+---
+
+## 7. Modelo de Datos Simplificado
+
+```mermaid
+erDiagram
+    USER ||--o{ TICKET : owns
+    USER ||--o{ FAN_CLUB_MEMBER : has
+    ARTIST ||--|| FAN_CLUB : creates
+    EVENT ||--o{ TICKET_TIER : has
+    EVENT }|--|| VENUE : at
+    TICKET_TIER ||--o{ TICKET : generates
+    FAN_CLUB ||--o{ BENEFIT : offers
+
+    USER {
+        uuid id
+        string email
+        string wallet_public_key
+    }
+    ARTIST {
+        uuid id
+        string name
+        boolean verified
+    }
+    FAN_CLUB {
+        uuid id
+        string name
+        decimal price
+    }
+    EVENT {
+        uuid id
+        string name
+        int resale_max_pct
+    }
+    TICKET {
+        uuid id
+        string mint_address
+        string status
+        string design_type
+    }
+```

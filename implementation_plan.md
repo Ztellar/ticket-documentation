@@ -1,95 +1,113 @@
-# Planificación Técnica y Arquitectura: TokenTicket
+# Spot: Plan Técnico
 
-## 1. Resumen Ejecutivo
-TokenTicket es un ecosistema de ticketing descentralizado que utiliza tecnología Blockchain para garantizar la propiedad, trazabilidad y control del mercado secundario de entradas. El sistema incorpora validación física mediante NFC y soporte multiplataforma (Web y Móvil).
+## 1. Visión
 
-**> [!NOTE]**
-**> Ver [Especificación de Diseño y Diagramas (Casos de Uso, BPMN)](file:///C:/Users/Benja/.gemini/antigravity/brain/85929a9c-a527-46a0-a18c-38c5bdc2dee7/design_diagrams.md) para detalles visuales de los flujos.**
+**Spot** elimina fraudes en ticketing usando blockchain invisible. Los usuarios compran con CLP, el sistema mintea NFTs automáticamente.
 
-## 2. Tecnologías Seleccionadas (Stack Tecnológico)
+---
 
-Para garantizar un rendimiento de "clase mundial", escalabilidad real y bajos costos, se ha seleccionado el siguiente stack:
+## 2. Arquitectura
 
-### 2.1. Blockchain: **Solana**
-*   **Justificación:** Es la blockchain de capa 1 más rápida (65,000 TPS teóricos, ~4,000 reales) y económica (<$0.001 por transacción).
-*   **Por qué no EVM (Ethereum/Polygon)?** Aunque Polygon es rápido, Solana ofrece una latencia final mucho menor ("sub-second finality"), lo cual es crítico para la validación en puerta (NFC) donde cada milisegundo cuenta para el flujo de personas.
-*   **Estándar de Token:** Metaplex (Estándar de NFTs en Solana) con "Programmable NFTs" (pNFTs) para forzar regalías y reglas de transferencia a nivel de protocolo.
-
-### 2.2. Backend & API: **NestJS (Node.js)**
-*   **Justificación:** Framework progresivo de Node.js, altamente escalable y modular.
-*   **Arquitectura:** Microservicios o Monolito Modular.
-*   **Base de Datos:**
-    *   **PostgreSQL:** Para datos relacionales off-chain (perfiles de usuario, configuración de eventos, analíticas).
-    *   **Redis:** Para caché de alto rendimiento y sesiones.
-*   **Cola de Mensajes:** BullMQ (Redis based) para manejar picos de minting masivo sin bloquear el servidor.
-
-### 2.3. Frontend (Web Organizadores & Marketplace): **Next.js (React)**
-*   **Justificación:** Renderizado híbrido (SSR/CSR) para SEO y velocidad. Excelente integración con wallets de Solana (Wallet Adapter).
-*   **Estilo:** Tailwind CSS + ShadcnUI para una interfaz moderna y premium.
-
-### 2.4. Aplicaciones Móviles (Usuario & Validador): **React Native (Expo)**
-*   **Justificación:** Permite usar una base de código única para iOS y Android con rendimiento nativo.
-*   **NFC:** Librería `react-native-nfc-manager` para comunicación bidireccional entre el móvil del usuario y el del validador.
-
-### 2.5. Almacenamiento Descentralizado: **IPFS (via Pinata o Arweave)**
-*   **Uso:** Almacenar imágenes y metadatos de los tickets para que sean inmutables y no dependan de un servidor central.
-
-## 3. Arquitectura del Sistema
-
-```mermaid
-graph TD
-    UserApp[App Móvil Usuario] -->|NFC / Internet| ValidatorApp[App Validator]
-    UserApp -->|RPC / API| Solana[Blockchain Solana]
-    ValidatorApp -->|Verificación On-Chain| Solana
-    OrganizerWeb[Web Organizador] -->|Gestión| BackendAPI[API NestJS]
-    BackendAPI -->|Indexación/Metadatos| DB[(PostgreSQL)]
-    BackendAPI -->|Minting/Transacciones| Solana
-    Solana -->|Metadatos| IPFS[Arweave/IPFS]
+```
+spot-web (Next.js) ──┐
+spot-mobile (Kotlin) ├── spot-backend (NestJS) ── PostgreSQL/Redis
+spot-validator ──────┘                        └── Solana/Alchemy
 ```
 
-### Flujo de Validación NFC (Offline/Online Híbrido)
-1.  **Usuario:** Abre su entrada en la App. La App genera un "Zero-Knowledge Proof" o firma un mensaje temporal con su llave privada (dueña del NFT).
-2.  **Transmisión:** El usuario acerca el celular al lector (App Validador) via NFC.
-3.  **Validador:** Recibe la firma y consulta a la Blockchain (o a un índice local actualizado) si esa llave pública posee el NFT válido para el evento.
-4.  **Confirmación:** < 2 segundos.
+### Módulos Backend
+| Módulo | Responsabilidad |
+|--------|-----------------|
+| AuthModule | JWT, wallets custodiales |
+| UsersModule | CRUD usuarios |
+| ArtistsModule | Artistas, fan clubs |
+| EventsModule | Eventos, tiers, venues |
+| TicketsModule | Compra, reserva, mint |
+| MarketModule | Reventa, royalties |
+| PaymentsModule | WebPay, MercadoPago, Flow |
+| BlockchainModule | Solana minting |
+| MultiChainModule | Verificación ETH/Polygon |
+| ValidationModule | NFC, check-in |
 
-## 4. Estrategia de Escalabilidad
-*   **Blockchain:** Solana maneja nativamente la escala de transacciones. Para "drops" masivos, se utiliza el "Candy Machine" de Metaplex que gestiona la concurrencia.
-*   **Backend:** Despliegue en contenedores (Docker/Kubernetes). Balanceadores de carga de AWS/GCP para distribuir el tráfico HTTP.
-*   **Optimización:** Indexadores propios (o servicios como Helius) para leer el estado de la blockchain rápidamente sin saturar los nodos RPC.
+---
 
-## 5. Plan de Implementación (Roadmap)
+## 3. Stack
 
-### Fase 1: Core Blockchain & Smart Contracts (Semana 1-4)
-*   Desarrollo de Programas en Solana (Rust/Anchor).
-*   Definición de reglas de Royalty y Transferencia restringida.
-*   Tests unitarios en red local.
+| Capa | Tecnología |
+|------|------------|
+| Backend | NestJS 10, TypeORM |
+| Database | PostgreSQL 15, Redis 7 |
+| Frontend | Next.js 14, TailwindCSS |
+| Mobile | Android Kotlin API 26+ |
+| Blockchain | Solana (Metaplex) |
+| Multi-chain | Alchemy/Moralis |
 
-### Fase 2: Backend & Infraestructura (Semana 3-6)
-*   Setup de NestJS + PostgreSQL.
-*   API de creación de eventos y subida de metadatos a IPFS.
-*   Integración con Solana (Minting API).
+---
 
-### Fase 3: Web App de Organizador (Semana 5-8)
-*   Dashboard para crear eventos (Formularios, Imágenes).
-*   Dashboard de ventas y analíticas en tiempo real.
+## 4. Seguridad
 
-### Fase 4: App Móvil Usuario (Wallet) (Semana 7-10)
-*   Creación de Wallet in-app (Custodial o Non-custodial con "Web3Auth" para login social).
-*   Visualización de Tickets (NFTs).
-*   Implementación de NFC para emitir prueba de propiedad.
+### Wallets Custodiales
+- Generación: `Keypair.generate()` (Solana)
+- Encriptación: AES-256-GCM
+- Key rotation: AWS KMS o Vault
+- Almacenamiento: `wallet_secret_encrypted` + `key_version`
 
-### Fase 5: App Móvil Validador & Acreditación (Semana 9-11)
-*   Lectura NFC.
-*   Lógica de verificación contra la Blockchain.
-*   Sistema de acreditación (badges para staff/VIP).
+### NFC Anti-Replay
+```
+payload = { ticketId, timestamp, nonce, signature }
+1. Verificar timestamp < 60s
+2. Verificar nonce único (Redis SET)
+3. Verificar firma Ed25519
+```
 
-### Fase 6: QA, Auditoría y Despliegue (Semana 12)
-*   Auditoría de seguridad de Smart Contracts.
-*   Pruebas de carga (Load Testing).
-*   Despliegue en Mainnet Beta de Solana.
+### Rate Limiting
+- `/tickets/purchase`: 3 req/seg
+- `/marketplace`: 100 req/min
+- General: 1000 req/min
 
-## 6. Siguientes Pasos (Aprobación de Usuario)
-*   Confirmar si se prefiere **Solana** (recomendado para performance) o se insiste en EVM (Polygon/Base - más compatible pero potencialmente más lento/caro en picos, aunque muy capaz).
-*   Validar el alcance de la **App de Acreditación** (¿separada o rol dentro de la App Validador?). *Suposición: App separada o módulo específico.*
+---
 
+## 5. Cumplimiento Chile
+
+| Regulación | Acción |
+|------------|--------|
+| CMF Ley Fintech | Registro si >100M CLP/año |
+| SII IVA | Campo `iva_amount` en transactions |
+| Ley 19.628 | Consentimientos datos |
+
+---
+
+## 6. Fases
+
+| Fase | Semanas | Alcance |
+|------|---------|---------|
+| 0 | 1 | Docker, CI/CD, boilerplate |
+| 1 | 2 | Auth, wallets, CRUD base |
+| 2 | 3 | Blockchain, pagos, IVA |
+| 3 | 2 | Tickets, validación NFC |
+| 4 | 1.5 | Marketplace, royalties |
+| 5 | 1.5 | Fan clubs multi-chain |
+| 6 | 2 | Frontend web |
+| 7 | 2 | Mobile Android |
+| 8 | 1 | Auditorías, testing |
+
+**Total: ~16 semanas**
+
+---
+
+## 7. Costos Mensuales 2025
+
+| Item | USD |
+|------|-----|
+| Servidores (Railway) | 75 |
+| Solana RPC (Helius) | 100 |
+| Fallback RPC | 50 |
+| Gas Solana | 50 |
+| **Total** | **~275** |
+
+---
+
+## 8. Documentos Relacionados
+
+- [database_schema.md](file:///C:/Users/Benja/.gemini/antigravity/brain/85929a9c-a527-46a0-a18c-38c5bdc2dee7/database_schema.md) - Esquema SQL completo
+- [api_specification.md](file:///C:/Users/Benja/.gemini/antigravity/brain/85929a9c-a527-46a0-a18c-38c5bdc2dee7/api_specification.md) - APIs detalladas
+- [business_model.md](file:///C:/Users/Benja/.gemini/antigravity/brain/85929a9c-a527-46a0-a18c-38c5bdc2dee7/business_model.md) - Modelo de negocios
