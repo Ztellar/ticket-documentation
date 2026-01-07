@@ -1,12 +1,12 @@
 # Spot: Checklist de Desarrollo
 
 ## Fase 0: Setup (1 semana)
-- [ ] Docker Compose (Postgres 15, Redis 7)
-- [ ] NestJS boilerplate con módulos
-- [ ] TypeORM + primera migración
-- [ ] ESLint + Prettier + Husky
+- [x] Docker Compose (Postgres 15, Redis 7)
+- [x] NestJS boilerplate con módulos
+- [x] TypeORM + primera migración
+- [x] ESLint + Prettier + Husky
 - [ ] GitHub Actions CI (lint, test)
-- [ ] .env.example + documentación
+- [x] .env.example + documentación
 
 ## Fase 1: Core Backend (2 semanas)
 - [ ] AuthModule: register, login, refresh
