@@ -137,3 +137,33 @@ npm install -D @types/passport-jwt @types/bcrypt
 - `@IsNumber()`, `@Min()`, `@Max()`
 - `@IsArray()`, `@ValidateNested()`, `@Type()`
 - `@IsOptional()`, `@IsBoolean()`, `@IsEnum()`
+
+---
+
+## 2026-01-17 - Fase 1: AuthModule
+
+### Archivos Creados
+| Archivo | Descripción |
+|---------|-------------|
+| `src/auth/auth.module.ts` | Módulo con JWT, Passport, TypeORM |
+| `src/auth/auth.service.ts` | Register, login, refresh tokens |
+| `src/auth/auth.controller.ts` | Endpoints /auth/* |
+| `src/auth/wallet.service.ts` | Generación wallet + AES-256-GCM |
+| `src/auth/dto/*.ts` | RegisterDto, LoginDto, RefreshTokenDto |
+| `src/auth/strategies/jwt.strategy.ts` | Validación JWT |
+| `src/auth/guards/jwt-auth.guard.ts` | Protección rutas |
+| `src/auth/guards/roles.guard.ts` | RBAC por rol |
+| `src/auth/decorators/*.ts` | @Public, @Roles, @CurrentUser |
+
+### Endpoints Implementados
+```
+POST /auth/register → {accessToken, refreshToken}
+POST /auth/login → {accessToken, refreshToken}
+POST /auth/refresh → {accessToken, refreshToken}
+```
+
+### Seguridad Implementada
+- Passwords hasheados con bcrypt (10 rounds)
+- Wallets encriptadas con AES-256-GCM
+- JWT access token expira en 15 minutos
+- JWT refresh token expira en 7 días
