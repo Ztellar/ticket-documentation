@@ -167,3 +167,99 @@ POST /auth/refresh → {accessToken, refreshToken}
 - Wallets encriptadas con AES-256-GCM
 - JWT access token expira en 15 minutos
 - JWT refresh token expira en 7 días
+
+---
+
+## 2026-01-18 - Fase 2: Blockchain + Pagos
+
+### BlockchainModule Mejorado
+| Funcionalidad | Descripción |
+|---------------|-------------|
+| RPC dinámico | Configurable via env (Helius/QuickNode) |
+| Fee Payer | Wallet auto-generada con airdrop en Devnet |
+| Transfer NFT | `transferTicket()` para reventas |
+| Metadata | `getTicketMetadata()` consulta on-chain |
+
+### PaymentsModule
+| Provider | Estado |
+|----------|--------|
+| WebPay (Transbank) | Mock sandbox |
+| MercadoPago | Mock sandbox |
+| Flow.cl | Mock sandbox |
+
+### Características
+- Webhook processing con verificación HMAC-SHA256
+- Idempotencia via cache in-memory
+- Cálculo automático IVA (19%)
+- Variables de entorno para todos los providers
+
+---
+
+## 2026-01-18 - Fase 3: Tickets + Validación
+
+### ReservationService
+- Reservas temporales en Redis (TTL 5 minutos)
+- Hold counts por tier para prevenir overselling
+- Extensión de reserva si está pagando
+
+### PurchaseService
+Flujo completo: **reserve → pay → mint NFT → confirm**
+- Validación disponibilidad tier
+- Integración con PaymentsService
+- Minting automático post-pago
+- Creación de tickets en DB
+
+### ValidationModule (NFC-only)
+| Endpoint | Descripción |
+|----------|-------------|
+| GET /validation/nonce | Obtener nonce anti-replay |
+| POST /validation/validate | Validar ticket NFC |
+| POST /validation/manual | Validación manual (fallback) |
+| POST /validation/undo/:id | Deshacer validación (5 min) |
+| GET /validation/stats/:eventId | Estadísticas de validación |
+
+### Seguridad Anti-Replay
+1. Staff solicita nonce (válido 1 hora)
+2. App genera payload: `ticketId|timestamp|signature`
+3. Nonce consumido tras uso (one-time)
+4. Timestamp validado < 5 minutos
+
+---
+
+## 2026-01-18 - Fase 4: Marketplace
+
+### MarketplaceService
+| Funcionalidad | Descripción |
+|---------------|-------------|
+| Listar ticket | Con validación `resaleLimitPercent` |
+| Quitar de venta | Retorna a estado ACTIVE |
+| Buscar listings | Filtros por evento, precio, paginación |
+| Comprar reventa | Inicia pago + transferencia NFT |
+
+### Modelo de Royalties (Corregido)
+```
+Precio vendedor: $100,000 CLP → Vendedor recibe 100%
+
+Buyer paga:
+├── Ticket:         $100,000
+├── Spot Fee (5%):   $5,000 + IVA $950
+├── Organizer:       $3,000 (pass-through)
+├── Artist:          $2,000 (pass-through)
+├── Procesador:      $3,300
+└── TOTAL:        $114,250
+```
+
+### Payout Entity
+- Tipos: `seller`, `organizer`, `artist`
+- Estados: `pending` → `processing` → `completed`
+- Creados automáticamente al confirmar reventa
+
+---
+
+## 2026-01-18 - Fase 5: Fan Clubs (En Progreso)
+
+### Objetivos
+- LinkedWalletsModule para conexión multi-chain
+- Verificación NFT en Ethereum/Polygon/Solana
+- Membresías automáticas via NFT holdings
+
